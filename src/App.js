@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import "./App.css";
+import confetti from "canvas-confetti";
 
-/* Fix timezone problem */
 function formatDate(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -26,19 +27,44 @@ export default function App() {
     localStorage.setItem("exercise-data", JSON.stringify(marked));
   }, [marked]);
 
-  /* Only allow today to toggle */
+  /* Notification permission */
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    const hour = new Date().getHours();
+
+    if (hour >= 20 && !marked[todayStr]) {
+      if (Notification.permission === "granted") {
+        new Notification("Workout Reminder 💪", {
+          body: "You have not exercised today!"
+        });
+      }
+    }
+
+  }, [marked, todayStr]);
+
   function toggle(date) {
 
     if (date !== todayStr) return;
 
-    setMarked(prev => ({
-      ...prev,
-      [date]: !prev[date]
-    }));
+    const newState = {
+      ...marked,
+      [date]: !marked[date]
+    };
+
+    setMarked(newState);
+
+    if (!marked[date]) {
+      confetti({
+        particleCount: 120,
+        spread: 80
+      });
+    }
 
   }
 
-  /* Streak calculation */
   function calculateStreak() {
 
     let streak = 0;
@@ -60,7 +86,30 @@ export default function App() {
     return streak;
   }
 
+  function longestStreak() {
+
+    let max = 0;
+    let current = 0;
+
+    const dates = Object.keys(marked).sort();
+
+    for (let d of dates) {
+
+      if (marked[d]) {
+        current++;
+        max = Math.max(max, current);
+      } else {
+        current = 0;
+      }
+
+    }
+
+    return max;
+
+  }
+
   const streak = calculateStreak();
+  const best = longestStreak();
 
   const months = [
     "January","February","March","April","May","June",
@@ -123,13 +172,23 @@ export default function App() {
     );
   }
 
+  const monthDates = Object.keys(marked).filter(d => d.startsWith(`${year}-${String(month+1).padStart(2,'0')}`));
+  const progress = Math.round((monthDates.length / daysInMonth) * 100);
+
   return (
 
     <div className="app">
 
       <h1>💪 Exercise Tracker</h1>
 
-      <h2>🔥 Streak: {streak} days</h2>
+      <div className="stats">
+        <div>🔥 Streak: {streak}</div>
+        <div>🏆 Best: {best}</div>
+      </div>
+
+      <div className="progress">
+        <div className="bar" style={{width: progress + "%"}}></div>
+      </div>
 
       <div className="calendar">
 
@@ -154,5 +213,6 @@ export default function App() {
       </div>
 
     </div>
+
   );
 }
